@@ -25,7 +25,7 @@ resource "aws_s3_bucket_versioning" "this" {
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
-  count = var.enable_sse_kms_default && var.kms_key_arn != "" ? 1 : 0
+  count = var.enable_sse_kms_default ? 1 : 0
 
   bucket = aws_s3_bucket.this.id
 

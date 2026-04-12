@@ -2,11 +2,11 @@ locals {
   metadata = {
     aws_region     = "us-east-2"
     environment    = "Laboratory"
-    public_domain  = "example.internal"
-    private_domain = "example"
+    public_domain  = "democorp.cloud"
+    private_domain = "democorp"
 
     key = {
-      company = "demo"
+      company = "dmc"
       region  = "use2"
       env     = "lab"
       layer   = "security"
