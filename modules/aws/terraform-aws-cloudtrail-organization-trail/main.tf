@@ -50,12 +50,21 @@ resource "aws_iam_role" "cloudtrail_cwl" {
   tags = var.tags
 }
 
-resource "aws_iam_role_policy" "cloudtrail_cwl" {
+resource "aws_iam_policy" "cloudtrail_cwl" {
   count = var.enable_cloudwatch_logs ? 1 : 0
 
-  name   = "cloudtrail-cwl"
-  role   = aws_iam_role.cloudtrail_cwl[0].id
-  policy = data.aws_iam_policy_document.cloudtrail_cwl[0].json
+  name        = substr("${local.cloudwatch_role_name}-logs-policy", 0, 128)
+  description = "CloudTrail delivery to CloudWatch Logs for trail ${var.trail_name}"
+  policy      = data.aws_iam_policy_document.cloudtrail_cwl[0].json
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "cloudtrail_cwl" {
+  count = var.enable_cloudwatch_logs ? 1 : 0
+
+  role       = aws_iam_role.cloudtrail_cwl[0].name
+  policy_arn = aws_iam_policy.cloudtrail_cwl[0].arn
 }
 
 resource "aws_cloudtrail" "this" {
