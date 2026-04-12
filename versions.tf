@@ -5,7 +5,7 @@ terraform {
     aws = {
       source                = "hashicorp/aws"
       version               = ">= 6.0"
-      configuration_aliases = [aws.log, aws.kms]
+      configuration_aliases = [aws.org, aws.sec, aws.log, aws.kms]
     }
   }
 }

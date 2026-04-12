@@ -2,6 +2,8 @@ module "wrapper_cloudtrail" {
   source = "../../"
 
   providers = {
+    aws.org = aws
+    aws.sec = aws
     aws.log = aws
     aws.kms = aws
   }
