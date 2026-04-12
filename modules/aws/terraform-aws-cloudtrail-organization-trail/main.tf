@@ -34,8 +34,8 @@ data "aws_iam_policy_document" "cloudtrail_cwl" {
   statement {
     effect = "Allow"
     actions = [
-      "logs:CreateLogStream",
       "logs:PutLogEvents",
+      "logs:CreateLogStream",
     ]
     resources = ["${aws_cloudwatch_log_group.trail[0].arn}:*"]
   }
