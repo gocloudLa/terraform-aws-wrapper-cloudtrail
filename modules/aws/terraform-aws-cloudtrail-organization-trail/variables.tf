@@ -37,10 +37,16 @@ variable "cloudwatch_log_group_name" {
   default     = ""
 }
 
-variable "cloudwatch_log_retention_days" {
+variable "cloudwatch_log_group_retention_days" {
   type        = number
-  description = "Log retention in days for the CloudTrail log group."
+  description = "CloudWatch log group retention in days for CloudTrail."
   default     = 90
+}
+
+variable "cloudwatch_log_group_deletion_protection_enabled" {
+  type        = bool
+  description = "Deletion protection on the CloudTrail CloudWatch log group (see aws_cloudwatch_log_group deletion_protection_enabled)."
+  default     = true
 }
 
 variable "event_selectors" {

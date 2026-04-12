@@ -96,4 +96,4 @@ input_table: |
   | **cloudtrail_parameters.enable** | Create all resources | `bool` | `false` | no |
   | **log_bucket** | `bucket_name`, `force_destroy`, `enable_versioning` (default true), `enable_bucket_policy`, `enable_sse_kms_default`, `enforce_s3_source_org_id`, access logging, lifecycle | `map` | see code | no |
   | **kms** | `alias_name`, `description`, `deletion_window_in_days`, `enable_key_rotation` | `map` | see code | no |
-  | **trail** | `enable_cloudwatch_logs`, `cloudwatch_log_group_name`, `cloudwatch_log_retention_days`, `event_selectors`, `sns_topic_arn` (sent as `sns_topic_name` to AWS; name or ARN) | `map` | see code | no |
+  | **trail** | `enable_cloudwatch_logs`, `cloudwatch_log_group_name`, `cloudwatch_log_group_retention_days`, `cloudwatch_log_group_deletion_protection_enabled`, `event_selectors`, `sns_topic_arn` (sent as `sns_topic_name` to AWS; name or ARN) | `map` | see code | no |

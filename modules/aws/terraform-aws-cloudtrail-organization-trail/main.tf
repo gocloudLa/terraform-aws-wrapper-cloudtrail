@@ -1,8 +1,9 @@
 resource "aws_cloudwatch_log_group" "trail" {
   count = var.enable_cloudwatch_logs ? 1 : 0
 
-  name              = var.cloudwatch_log_group_name
-  retention_in_days = var.cloudwatch_log_retention_days
+  name                        = var.cloudwatch_log_group_name
+  retention_in_days           = var.cloudwatch_log_group_retention_days
+  deletion_protection_enabled = var.cloudwatch_log_group_deletion_protection_enabled
 
   tags = var.tags
 

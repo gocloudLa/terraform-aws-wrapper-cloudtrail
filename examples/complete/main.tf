@@ -55,11 +55,14 @@ module "wrapper_cloudtrail" {
     # trail — commented lines show wrapper defaults; uncomment to override.
     # -------------------------------------------------------------------------
     trail = {
-      # enable_cloudwatch_logs          = false
-      # cloudwatch_log_group_name       = null
-      # cloudwatch_log_retention_days   = 90
-      # event_selectors                 = null
-      # sns_topic_arn                   = null
+      # enable_cloudwatch_logs                              = false
+      # cloudwatch_log_group_name                           = null
+      # cloudwatch_log_group_retention_days                 = 90
+      # cloudwatch_log_group_deletion_protection_enabled    = true
+      # event_selectors                                     = null
+      # sns_topic_arn                                       = null
+
+      cloudwatch_log_group_deletion_protection_enabled = false # Default: true; false so destroy can remove the log group in this example
       #
       # event_selectors example (replaces default when set):
       # event_selectors = [
