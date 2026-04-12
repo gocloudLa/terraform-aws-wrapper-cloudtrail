@@ -73,7 +73,7 @@ data "aws_iam_policy_document" "cloudtrail_cwl" {
 
 resource "aws_iam_role" "cloudtrail_cwl" {
   count    = var.enable_cloudwatch_logs ? 1 : 0
-  provider = aws.sec
+  # provider = aws.sec
 
   name               = local.cloudwatch_role_name
   assume_role_policy = data.aws_iam_policy_document.cloudtrail_cwl_assume[0].json
@@ -83,7 +83,7 @@ resource "aws_iam_role" "cloudtrail_cwl" {
 
 resource "aws_iam_policy" "cloudtrail_cwl" {
   count    = var.enable_cloudwatch_logs ? 1 : 0
-  provider = aws.sec
+  # provider = aws.sec
 
   name        = substr("${local.cloudwatch_role_name}-logs-policy", 0, 128)
   description = "CloudTrail delivery to CloudWatch Logs for trail ${var.trail_name}"
@@ -94,7 +94,7 @@ resource "aws_iam_policy" "cloudtrail_cwl" {
 
 resource "aws_iam_role_policy_attachment" "cloudtrail_cwl" {
   count    = var.enable_cloudwatch_logs ? 1 : 0
-  provider = aws.sec
+  # provider = aws.sec
 
   role       = aws_iam_role.cloudtrail_cwl[0].name
   policy_arn = aws_iam_policy.cloudtrail_cwl[0].arn
