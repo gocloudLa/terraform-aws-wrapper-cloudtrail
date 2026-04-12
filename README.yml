@@ -1,0 +1,99 @@
+module_name: Terraform CloudTrail Organization Trail Module
+module_description: |
+  Wrapper for an organization-level, multi-Region AWS CloudTrail trail with a dedicated S3 log bucket,
+  SSE-KMS default encryption, organization bucket policy, optional S3 access logging and lifecycle,
+  optional CloudWatch Logs, configurable event selectors, optional SNS notifications, and a
+  customer-managed KMS key whose policy supports CloudTrail and cross-account S3 use.
+  Uses three provider configurations—default `aws` (sec / organization management account), `aws.log`, and `aws.kms`—so you can deploy in one account or split across accounts.
+module_badges:
+  - url: "https://github.com/gocloudLa/terraform-aws-wrapper-cloudtrail/releases/latest"
+    image: "https://img.shields.io/github/v/release/gocloudLa/terraform-aws-wrapper-cloudtrail.svg?style=for-the-badge"
+    alt: "Latest Release"
+  - url: ""
+    image: "https://img.shields.io/github/last-commit/gocloudLa/terraform-aws-wrapper-cloudtrail.svg?style=for-the-badge"
+    alt: "Last Commit"
+  - url: "https://registry.terraform.io/modules/gocloudLa/wrapper-cloudtrail/aws"
+    image: "https://img.shields.io/badge/Terraform-Registry-7B42BC?style=for-the-badge&logo=terraform&logoColor=white"
+    alt: "Terraform Registry"
+quick_start: |
+  ```hcl
+  module "cloudtrail" {
+    source = "gocloudLa/wrapper-cloudtrail/aws"
+
+    providers = {
+      aws     = aws     # sec — organization management account
+      aws.log = aws.log # log archive account (or same as aws)
+      aws.kms = aws.kms # KMS account (or same as aws)
+    }
+
+    metadata = local.metadata
+
+    cloudtrail_parameters = {
+      enable = true
+
+      log_bucket = {
+        force_destroy = false
+      }
+
+      kms = {
+        deletion_window_in_days = 30
+        enable_key_rotation     = true
+      }
+
+      trail = {
+        enable_cloudwatch_logs = false
+      }
+    }
+  }
+  ```
+features:
+  - icon: ""
+    title: Multi-provider layout (sec / log / kms)
+    short_description: One account or three—map each provider alias to the right AWS configuration.
+    long_description: |
+      The default `aws` provider creates the organization trail in the management account.
+      `aws.log` owns the S3 bucket; `aws.kms` owns the CMK. Pass the same provider three times for a single-account lab, or use `assume_role` per alias for split accounts.
+    examples:
+      - title: "Same account"
+        code: |
+          ```hcl
+          providers = { aws = aws, aws.log = aws, aws.kms = aws }
+          ```
+  - icon: ""
+    title: Organization trail and bucket policy
+    short_description: Multi-Region trail, S3 policy with CloudTrail service principal and ArnLike on SourceArn.
+    long_description: |
+      Bucket policy follows AWS guidance for CloudTrail delivery under the optional key prefix and `AWSLogs/*`.
+      Optional `aws:SourceOrgID` can be enabled via `log_bucket.enforce_s3_source_org_id` when validated in your org.
+    examples:
+      - title: "Reference"
+        code: |
+          ```text
+          https://docs.aws.amazon.com/awscloudtrail/latest/userguide/create-s3-bucket-policy-for-cloudtrail.html
+          ```
+  - icon: ""
+    title: KMS for CloudTrail and bucket encryption
+    short_description: Key policy allows CloudTrail GenerateDataKey, logs-account decrypt, and S3 via kms:ViaService.
+    long_description: |
+      Supports the common pattern where the CMK lives in a sec or log-archive account and the bucket uses SSE-KMS with bucket key enabled.
+    examples:
+      - title: "KMS block"
+        code: |
+          ```hcl
+          kms = { deletion_window_in_days = 30, enable_key_rotation = true }
+          ```
+important_notes: |
+  - **Management account:** `is_organization_trail = true` must be created from the AWS Organizations management account (or delegated pattern per AWS docs).
+  - **Organizations:** When `enable = true`, the module reads `aws_organizations_organization` on the default provider.
+  - **Destroy order:** Terraform usually destroys the trail before the bucket; use `log_bucket.force_destroy = true` if objects remain.
+  - **Graph:** The trail module takes `s3_bucket_name` and `kms_key_id` from sibling module outputs, so Terraform orders creates/updates without explicit `depends_on`.
+  - **Event selectors:** Override with `trail.event_selectors` when needed; omit to keep the module default (management events).
+  - **Destroy protection:** Terraform `lifecycle.prevent_destroy` cannot use variables; use stack policy, IAM, or manual processes to guard production deletes.
+input_table: |
+  | metadata | Standard GoCloud metadata (`key.company`, `key.env`, `environment`, optional `common_name` / `common_tags`, `aws_region` in consumers) | `any` | — | yes |
+  | cloudtrail_parameters | Main input map (`enable`, `trail_name`, `s3_key_prefix`, `tags`, nested `log_bucket`, `kms`, `trail`) | `any` | `{}` | no |
+  | cloudtrail_defaults | Optional defaults (e.g. `tags`); merged with `metadata.common_tags` and `cloudtrail_parameters.tags` on all child resources | `any` | `{}` | no |
+  | **cloudtrail_parameters.enable** | Create all resources | `bool` | `false` | no |
+  | **log_bucket** | `bucket_name`, `force_destroy`, `enable_versioning` (default true), `enable_bucket_policy`, `enable_sse_kms_default`, `enforce_s3_source_org_id`, access logging, lifecycle | `map` | see code | no |
+  | **kms** | `alias_name`, `description`, `deletion_window_in_days`, `enable_key_rotation` | `map` | see code | no |
+  | **trail** | `enable_cloudwatch_logs`, `cloudwatch_log_group_name`, `cloudwatch_log_retention_days`, `event_selectors`, `sns_topic_arn` (sent as `sns_topic_name` to AWS; name or ARN) | `map` | see code | no |
