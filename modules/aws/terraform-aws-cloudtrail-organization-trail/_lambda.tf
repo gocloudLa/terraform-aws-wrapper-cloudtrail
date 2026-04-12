@@ -12,7 +12,7 @@ module "trail_cwl_lambda" {
     aws = aws.sec
   }
 
-  function_name = substr("ct-cwl-${var.trail_name}", 0, 64)
+  function_name = substr("trail-cloudwatch-attach-${var.trail_name}", 0, 64)
   description   = "UpdateTrail CloudWatch Logs attachment for org trail ${var.trail_name}"
   handler       = "index.lambda_handler"
   runtime       = "python3.12"
