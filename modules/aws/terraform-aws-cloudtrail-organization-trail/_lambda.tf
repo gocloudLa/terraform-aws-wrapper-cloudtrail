@@ -20,7 +20,7 @@ module "trail_cwl_lambda" {
 
   maximum_retry_attempts = 0
 
-  source_path = "${path.module}/lambda/trail-awl-attach/"
+  source_path = "${path.module}/lambda/trail-cloudwatch-attach/"
 
   attach_policy_statements = true
   policy_statements = {
