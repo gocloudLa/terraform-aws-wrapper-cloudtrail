@@ -47,7 +47,10 @@ module "organization_trail" {
   source = "./modules/aws/terraform-aws-cloudtrail-organization-trail"
   count  = local.cloudtrail_enable
 
-  providers = { aws = aws.org }
+  providers = {
+    aws     = aws.org
+    aws.sec = aws.sec
+  }
 
   trail_name     = local.trail_name
   s3_bucket_name = module.log_bucket[0].bucket_id
@@ -55,6 +58,8 @@ module "organization_trail" {
   kms_key_id     = module.kms[0].key_arn
   tags           = merge(local.common_tags, try(var.cloudtrail_parameters.tags, var.cloudtrail_defaults.tags, null))
 
+  organization_management_account_id               = data.aws_organizations_organization.this[0].master_account_id
+  organization_id                                  = local.organization_id != null ? local.organization_id : ""
   enable_cloudwatch_logs                           = try(var.cloudtrail_parameters.trail.enable_cloudwatch_logs, false)
   cloudwatch_log_group_name                        = try(var.cloudtrail_parameters.trail.cloudwatch_log_group_name, "/aws/cloudtrail/${local.trail_name}")
   cloudwatch_log_group_retention_days              = try(var.cloudtrail_parameters.trail.cloudwatch_log_group_retention_days, 90)

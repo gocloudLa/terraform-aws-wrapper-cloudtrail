@@ -62,3 +62,15 @@ variable "sns_topic_arn" {
   nullable    = true
 }
 
+variable "organization_management_account_id" {
+  type        = string
+  description = "AWS Organizations management account ID (12 digits). Required when enable_cloudwatch_logs is true; used in the delegated-account CloudWatch Logs role policy."
+  default     = ""
+}
+
+variable "organization_id" {
+  type        = string
+  description = "Organization ID (o-xxxxxxxxxx). Required when enable_cloudwatch_logs is true; used for org-trail log stream ARNs in the delegated-account role policy."
+  default     = ""
+}
+

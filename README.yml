@@ -4,7 +4,7 @@ module_description: |
   SSE-KMS default encryption, organization bucket policy, optional S3 access logging and lifecycle,
   optional CloudWatch Logs, configurable event selectors, optional SNS notifications, and a
   customer-managed KMS key whose policy supports CloudTrail and cross-account S3 use.
-  Uses three provider configurations—default `aws` (sec / organization management account), `aws.log`, and `aws.kms`—so you can deploy in one account or split across accounts.
+  Uses `aws.org` (organization trail API / management), `aws.sec` (delegated security account for CloudWatch Logs when enabled), `aws.log` (S3 bucket), and `aws.kms` (CMK)—map each alias or pass the same provider where appropriate.
 module_badges:
   - url: "https://github.com/gocloudLa/terraform-aws-wrapper-cloudtrail/releases/latest"
     image: "https://img.shields.io/github/v/release/gocloudLa/terraform-aws-wrapper-cloudtrail.svg?style=for-the-badge"
@@ -21,9 +21,10 @@ quick_start: |
     source = "gocloudLa/wrapper-cloudtrail/aws"
 
     providers = {
-      aws     = aws     # sec — organization management account
-      aws.log = aws.log # log archive account (or same as aws)
-      aws.kms = aws.kms # KMS account (or same as aws)
+      aws.org = aws.org # management — organization trail
+      aws.sec = aws.sec # delegated admin — CloudWatch Logs (same as aws.org if single account)
+      aws.log = aws.log # log archive — S3 bucket
+      aws.kms = aws.kms # CMK account
     }
 
     metadata = local.metadata
@@ -48,16 +49,16 @@ quick_start: |
   ```
 features:
   - icon: ""
-    title: Multi-provider layout (sec / log / kms)
-    short_description: One account or three—map each provider alias to the right AWS configuration.
+    title: Multi-provider layout (org / sec / log / kms)
+    short_description: Map each provider alias to the right AWS configuration.
     long_description: |
-      The default `aws` provider creates the organization trail in the management account.
-      `aws.log` owns the S3 bucket; `aws.kms` owns the CMK. Pass the same provider three times for a single-account lab, or use `assume_role` per alias for split accounts.
+      `aws.org` runs the organization trail. With CloudWatch Logs enabled, the log group and IAM role are created in `aws.sec` (delegated admin pattern); pass the same provider as `aws.org` for a single-account lab.
+      `aws.log` owns the S3 bucket; `aws.kms` owns the CMK.
     examples:
       - title: "Same account"
         code: |
           ```hcl
-          providers = { aws = aws, aws.log = aws, aws.kms = aws }
+          providers = { aws.org = aws, aws.sec = aws, aws.log = aws, aws.kms = aws }
           ```
   - icon: ""
     title: Organization trail and bucket policy
@@ -96,4 +97,4 @@ input_table: |
   | **cloudtrail_parameters.enable** | Create all resources | `bool` | `false` | no |
   | **log_bucket** | `bucket_name`, `force_destroy`, `enable_versioning` (default true), `enable_bucket_policy`, `enable_sse_kms_default`, `enforce_s3_source_org_id`, access logging, lifecycle | `map` | see code | no |
   | **kms** | `alias_name`, `description`, `deletion_window_in_days`, `enable_key_rotation` | `map` | see code | no |
-  | **trail** | `enable_cloudwatch_logs`, `cloudwatch_log_group_name`, `cloudwatch_log_group_retention_days`, `cloudwatch_log_group_deletion_protection_enabled`, `event_selectors`, `sns_topic_arn` (sent as `sns_topic_name` to AWS; name or ARN) | `map` | see code | no |
+  | **trail** | `enable_cloudwatch_logs` (log group + role in `aws.sec`), `cloudwatch_log_group_name`, `cloudwatch_log_group_retention_days`, `cloudwatch_log_group_deletion_protection_enabled`, `event_selectors`, `sns_topic_arn` (sent as `sns_topic_name` to AWS; name or ARN). Org ID and management account ID for the CWL role policy come from Organizations data in the wrapper. | `map` | see code | no |
