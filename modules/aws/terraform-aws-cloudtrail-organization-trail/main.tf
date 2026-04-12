@@ -27,30 +27,34 @@ data "aws_iam_policy_document" "cloudtrail_cwl_assume" {
   }
 }
 
+data "aws_iam_policy_document" "cloudtrail_cwl" {
+  count = var.enable_cloudwatch_logs ? 1 : 0
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+    resources = ["${aws_cloudwatch_log_group.trail[0].arn}:*"]
+  }
+}
+
 resource "aws_iam_role" "cloudtrail_cwl" {
   count = var.enable_cloudwatch_logs ? 1 : 0
 
   name               = local.cloudwatch_role_name
   assume_role_policy = data.aws_iam_policy_document.cloudtrail_cwl_assume[0].json
 
-  inline_policy {
-    name = "cloudtrail-cwl"
-    policy = jsonencode({
-      Version = "2012-10-17"
-      Statement = [
-        {
-          Effect = "Allow"
-          Action = [
-            "logs:CreateLogStream",
-            "logs:PutLogEvents",
-          ]
-          Resource = "${aws_cloudwatch_log_group.trail[0].arn}:*"
-        },
-      ]
-    })
-  }
-
   tags = var.tags
+}
+
+resource "aws_iam_role_policy" "cloudtrail_cwl" {
+  count = var.enable_cloudwatch_logs ? 1 : 0
+
+  name   = "cloudtrail-cwl"
+  role   = aws_iam_role.cloudtrail_cwl[0].id
+  policy = data.aws_iam_policy_document.cloudtrail_cwl[0].json
 }
 
 resource "aws_cloudtrail" "this" {
