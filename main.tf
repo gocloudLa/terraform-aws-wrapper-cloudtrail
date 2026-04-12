@@ -10,7 +10,7 @@ module "kms" {
   alias_name              = try(var.cloudtrail_parameters.kms.alias_name, "alias/${local.common_name}-cloudtrail")
   tags                    = merge(local.common_tags, try(var.cloudtrail_parameters.tags, var.cloudtrail_defaults.tags, null))
 
-  sec_account_id = data.aws_caller_identity.sec.account_id
+  sec_account_id = data.aws_organizations_organization.this[0].master_account_id
   trail_name     = local.trail_name
   log_account_id = data.aws_caller_identity.log.account_id
   log_region     = data.aws_region.log.id
@@ -31,7 +31,7 @@ module "log_bucket" {
   organization_id                    = local.organization_id != null ? local.organization_id : ""
   enforce_s3_source_org_id_condition = try(var.cloudtrail_parameters.log_bucket.enforce_s3_source_org_id, false)
   enable_bucket_policy               = try(var.cloudtrail_parameters.log_bucket.enable_bucket_policy, true)
-  cloudtrail_trail_arn_pattern       = "arn:aws:cloudtrail:*:${data.aws_caller_identity.sec.account_id}:trail/${local.trail_name}"
+  cloudtrail_trail_arn_pattern       = "arn:aws:cloudtrail:*:${data.aws_organizations_organization.this[0].master_account_id}:trail/${local.trail_name}"
   kms_key_arn                        = module.kms[0].key_arn
   enable_sse_kms_default             = try(var.cloudtrail_parameters.log_bucket.enable_sse_kms_default, true)
 

@@ -28,7 +28,7 @@ variable "tags" {
 
 variable "sec_account_id" {
   type        = string
-  description = "Organization management / trail home account ID (sec provider) where the organization trail is created."
+  description = "AWS Organizations management account ID (for CloudTrail trail ARN conditions in the key policy)."
 }
 
 variable "trail_name" {

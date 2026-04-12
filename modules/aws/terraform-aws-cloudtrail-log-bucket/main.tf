@@ -65,8 +65,6 @@ data "aws_iam_policy_document" "cloudtrail_organization" {
     }
   }
 
-  # Covers management account, organization ID prefix (o-xxxx), and member account IDs under AWSLogs/.
-  # See https://docs.aws.amazon.com/awscloudtrail/latest/userguide/create-s3-bucket-policy-for-cloudtrail.html
   statement {
     sid    = "AWSCloudTrailWrite"
     effect = "Allow"
