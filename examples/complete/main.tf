@@ -2,7 +2,6 @@ module "wrapper_cloudtrail" {
   source = "../../"
 
   providers = {
-    aws     = aws
     aws.log = aws
     aws.kms = aws
   }
@@ -10,7 +9,7 @@ module "wrapper_cloudtrail" {
   metadata = local.metadata
 
   cloudtrail_parameters = {
-    enable = false
+    enable = true
 
     # -------------------------------------------------------------------------
     # Top-level — only add keys when you need non-defaults (see ../../locals.tf)

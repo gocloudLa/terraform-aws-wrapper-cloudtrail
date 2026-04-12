@@ -47,8 +47,6 @@ module "organization_trail" {
   source = "./modules/aws/terraform-aws-cloudtrail-organization-trail"
   count  = local.cloudtrail_enable
 
-  providers = { aws = aws }
-
   trail_name     = local.trail_name
   s3_bucket_name = module.log_bucket[0].bucket_id
   s3_key_prefix  = try(var.cloudtrail_parameters.s3_key_prefix, "cloudtrail")
