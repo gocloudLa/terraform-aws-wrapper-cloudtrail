@@ -31,6 +31,12 @@ variable "enable_cloudwatch_logs" {
   default     = false
 }
 
+variable "attach_cloudwatch_logs_via_delegated_lambda" {
+  type        = bool
+  description = "When true (and enable_cloudwatch_logs), a Lambda in the delegated (aws.sec) account calls cloudtrail:UpdateTrail to attach the log group and role. The aws_cloudtrail resource stays on the org provider and ignores CWL fields to avoid cross-account API errors and drift."
+  default     = true
+}
+
 variable "cloudwatch_log_group_name" {
   type        = string
   description = "CloudWatch Logs group name for CloudTrail."

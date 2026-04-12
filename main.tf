@@ -61,6 +61,7 @@ module "organization_trail" {
   organization_management_account_id               = data.aws_organizations_organization.this[0].master_account_id
   organization_id                                  = local.organization_id != null ? local.organization_id : ""
   enable_cloudwatch_logs                           = try(var.cloudtrail_parameters.trail.enable_cloudwatch_logs, false)
+  attach_cloudwatch_logs_via_delegated_lambda      = try(var.cloudtrail_parameters.trail.attach_cloudwatch_logs_via_delegated_lambda, true)
   cloudwatch_log_group_name                        = try(var.cloudtrail_parameters.trail.cloudwatch_log_group_name, "/aws/cloudtrail/${local.trail_name}")
   cloudwatch_log_group_retention_days              = try(var.cloudtrail_parameters.trail.cloudwatch_log_group_retention_days, 90)
   cloudwatch_log_group_deletion_protection_enabled = try(var.cloudtrail_parameters.trail.cloudwatch_log_group_deletion_protection_enabled, true)

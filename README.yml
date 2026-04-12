@@ -4,7 +4,46 @@ module_description: |
   SSE-KMS default encryption, organization bucket policy, optional S3 access logging and lifecycle,
   optional CloudWatch Logs, configurable event selectors, optional SNS notifications, and a
   customer-managed KMS key whose policy supports CloudTrail and cross-account S3 use.
-  Uses `aws.org` (organization trail API / management), `aws.sec` (delegated security account for CloudWatch Logs when enabled), `aws.log` (S3 bucket), and `aws.kms` (CMK)—map each alias or pass the same provider where appropriate.
+  Uses `aws.org` (organization trail), `aws.sec` (delegated account for CloudWatch Logs prerequisites when enabled), `aws.log` (S3 bucket), and `aws.kms` (CMK).
+
+  **Organization trail and Terraform / OpenTofu**
+
+  For an *organization* trail, AWS still encodes the **management (root) account** in the trail’s ARN, even when a **delegated administrator** creates or updates it. The API calls may run with delegated credentials, but the resource identity AWS returns is not “the delegated account’s trail ARN”.
+
+  ```text
+  # Example only (not real accounts):
+  #   delegated account ID   = 999988887777  # provider / STS identity
+  #   management account ID  = 111122223333  # Organizations root
+
+  Trail ARN from DescribeTrail / resource output:
+  arn:aws:cloudtrail:us-east-2:111122223333:trail/my-org-trail
+                                  ^^^^^^^^^^^^^
+                                  always the management account for org trails
+  ```
+
+  If you attach `aws_cloudtrail` to the **delegated** provider, Terraform / OpenTofu is managing that resource **in the context of the delegated account** (credentials, default assumptions, and often how operators read `provider = aws.sec`). The **returned `arn` attribute does not match that context**: it still shows `111122223333`, not `999988887777`. That mismatch is confusing for state, refresh, and any logic (policies, outputs, or sibling modules) that assumes “trail ARN account ID == provider account ID”.
+
+  ```hcl
+  # Misleading pairing: API caller is delegated, ARN is management.
+  resource "aws_cloudtrail" "this" {
+    provider = aws.sec # STS: 999988887777
+    name     = "my-org-trail"
+    # ...
+  }
+
+  # Typical output after apply:
+  # aws_cloudtrail.this.arn
+  # => "arn:aws:cloudtrail:us-east-2:111122223333:trail/my-org-trail"
+  #    Account in ARN (1111...) != account implied by provider (9999...)
+  ```
+
+  So the problem is not “AWS is wrong”—it is **consistent for org trails**—but **Terraform ties one resource to one provider account**, while **the canonical trail ARN always carries the management ID**. Keeping **`aws_cloudtrail` on `aws.org`** lines up provider account, API identity for the primary trail lifecycle, and the ARN’s account field, which avoids that inconsistency. CloudWatch Logs in another account remains a separate concern (see below).
+
+  **CloudWatch Logs: two patterns**
+
+  * **Log group in the management account** — Same account as the trail resource. Terraform can set `CloudWatchLogsLogGroupArn` and `CloudWatchLogsRoleArn` on `aws_cloudtrail` in one flow: caller account, log group, and role align with AWS rules, and there is no split API identity.
+
+  * **Log group in a designated account (e.g. security / delegated admin)** — AWS requires the CloudWatch log group used for delivery to exist in the *caller* account when you configure that integration via `CreateTrail` / `UpdateTrail`, and the IAM role CloudTrail assumes for Logs must work with that log group. The management-account provider cannot successfully apply those attributes while pointing at resources in another account (e.g. cross-account PassRole or “log group must be owned by the current account”). The supported operational sequence is: create the trail with Terraform on `aws.org`; create the log group and role in the delegated account (`aws.sec`); then run **`UpdateTrail` using credentials from that delegated account** (for example with the AWS CLI), passing the full trail ARN and the log group and role ARNs in the security account. That second step is not something a single `aws_cloudtrail` block on `aws.org` can do honestly in one apply without hitting those AWS constraints—so it is either done **manually or by separate automation outside the trail resource** that calls the CloudTrail API with the delegated account’s credentials.
 module_badges:
   - url: "https://github.com/gocloudLa/terraform-aws-wrapper-cloudtrail/releases/latest"
     image: "https://img.shields.io/github/v/release/gocloudLa/terraform-aws-wrapper-cloudtrail.svg?style=for-the-badge"
@@ -97,4 +136,4 @@ input_table: |
   | **cloudtrail_parameters.enable** | Create all resources | `bool` | `false` | no |
   | **log_bucket** | `bucket_name`, `force_destroy`, `enable_versioning` (default true), `enable_bucket_policy`, `enable_sse_kms_default`, `enforce_s3_source_org_id`, access logging, lifecycle | `map` | see code | no |
   | **kms** | `alias_name`, `description`, `deletion_window_in_days`, `enable_key_rotation` | `map` | see code | no |
-  | **trail** | `enable_cloudwatch_logs` (log group + role in `aws.sec`), `cloudwatch_log_group_name`, `cloudwatch_log_group_retention_days`, `cloudwatch_log_group_deletion_protection_enabled`, `event_selectors`, `sns_topic_arn` (sent as `sns_topic_name` to AWS; name or ARN). Org ID and management account ID for the CWL role policy come from Organizations data in the wrapper. | `map` | see code | no |
+  | **trail** | `enable_cloudwatch_logs` (log group + role in `aws.sec`), `attach_cloudwatch_logs_via_delegated_lambda` (default true: Lambda in `aws.sec` calls `UpdateTrail`; set false to attach CWL yourself), `cloudwatch_log_group_name`, `cloudwatch_log_group_retention_days`, `cloudwatch_log_group_deletion_protection_enabled`, `event_selectors`, `sns_topic_arn` (sent as `sns_topic_name` to AWS; name or ARN). Org ID and management account ID for the CWL role policy come from Organizations data in the wrapper. | `map` | see code | no |
