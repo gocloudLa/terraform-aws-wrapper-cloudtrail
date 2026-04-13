@@ -4,46 +4,6 @@ module_description: |
   SSE-KMS default encryption, organization bucket policy, optional S3 access logging and lifecycle,
   optional CloudWatch Logs, configurable event selectors, optional SNS notifications, and a
   customer-managed KMS key whose policy supports CloudTrail and cross-account S3 use.
-  Uses `aws.org` (organization trail), `aws.sec` (delegated account for CloudWatch Logs prerequisites when enabled), `aws.log` (S3 bucket), and `aws.kms` (CMK).
-
-  **Organization trail and Terraform / OpenTofu**
-
-  For an *organization* trail, AWS still encodes the **management (root) account** in the trail’s ARN, even when a **delegated administrator** creates or updates it. The API calls may run with delegated credentials, but the resource identity AWS returns is not “the delegated account’s trail ARN”.
-
-  ```text
-  # Example only (not real accounts):
-  #   delegated account ID   = 999988887777  # provider / STS identity
-  #   management account ID  = 111122223333  # Organizations root
-
-  Trail ARN from DescribeTrail / resource output:
-  arn:aws:cloudtrail:us-east-2:111122223333:trail/my-org-trail
-                                  ^^^^^^^^^^^^^
-                                  always the management account for org trails
-  ```
-
-  If you attach `aws_cloudtrail` to the **delegated** provider, Terraform / OpenTofu is managing that resource **in the context of the delegated account** (credentials, default assumptions, and often how operators read `provider = aws.sec`). The **returned `arn` attribute does not match that context**: it still shows `111122223333`, not `999988887777`. That mismatch is confusing for state, refresh, and any logic (policies, outputs, or sibling modules) that assumes “trail ARN account ID == provider account ID”.
-
-  ```hcl
-  # Misleading pairing: API caller is delegated, ARN is management.
-  resource "aws_cloudtrail" "this" {
-    provider = aws.sec # STS: 999988887777
-    name     = "my-org-trail"
-    # ...
-  }
-
-  # Typical output after apply:
-  # aws_cloudtrail.this.arn
-  # => "arn:aws:cloudtrail:us-east-2:111122223333:trail/my-org-trail"
-  #    Account in ARN (1111...) != account implied by provider (9999...)
-  ```
-
-  So the problem is not “AWS is wrong”—it is **consistent for org trails**—but **Terraform ties one resource to one provider account**, while **the canonical trail ARN always carries the management ID**. Keeping **`aws_cloudtrail` on `aws.org`** lines up provider account, API identity for the primary trail lifecycle, and the ARN’s account field, which avoids that inconsistency. CloudWatch Logs in another account remains a separate concern (see below).
-
-  **CloudWatch Logs: two patterns**
-
-  * **Log group in the management account** — Same account as the trail resource. Terraform can set `CloudWatchLogsLogGroupArn` and `CloudWatchLogsRoleArn` on `aws_cloudtrail` in one flow: caller account, log group, and role align with AWS rules, and there is no split API identity.
-
-  * **Log group in a designated account (e.g. security / delegated admin)** — AWS requires the CloudWatch log group used for delivery to exist in the *caller* account when you configure that integration via `CreateTrail` / `UpdateTrail`, and the IAM role CloudTrail assumes for Logs must work with that log group. The management-account provider cannot successfully apply those attributes while pointing at resources in another account (e.g. cross-account PassRole or “log group must be owned by the current account”). The supported operational sequence is: create the trail with Terraform on `aws.org`; create the log group and role in the delegated account (`aws.sec`); then run **`UpdateTrail` using credentials from that delegated account** (for example with the AWS CLI), passing the full trail ARN and the log group and role ARNs in the security account. That second step is not something a single `aws_cloudtrail` block on `aws.org` can do honestly in one apply without hitting those AWS constraints—so it is either done **manually or by separate automation outside the trail resource** that calls the CloudTrail API with the delegated account’s credentials.
 module_badges:
   - url: "https://github.com/gocloudLa/terraform-aws-wrapper-cloudtrail/releases/latest"
     image: "https://img.shields.io/github/v/release/gocloudLa/terraform-aws-wrapper-cloudtrail.svg?style=for-the-badge"
@@ -87,53 +47,36 @@ quick_start: |
   }
   ```
 features:
-  - icon: ""
-    title: Multi-provider layout (org / sec / log / kms)
-    short_description: Map each provider alias to the right AWS configuration.
-    long_description: |
-      `aws.org` runs the organization trail. With CloudWatch Logs enabled, the log group and IAM role are created in `aws.sec` (delegated admin pattern); pass the same provider as `aws.org` for a single-account lab.
-      `aws.log` owns the S3 bucket; `aws.kms` owns the CMK.
-    examples:
-      - title: "Same account"
-        code: |
-          ```hcl
-          providers = { aws.org = aws, aws.sec = aws, aws.log = aws, aws.kms = aws }
-          ```
-  - icon: ""
-    title: Organization trail and bucket policy
-    short_description: Multi-Region trail, S3 policy with CloudTrail service principal and ArnLike on SourceArn.
-    long_description: |
-      Bucket policy follows AWS guidance for CloudTrail delivery under the optional key prefix and `AWSLogs/*`.
-      Optional `aws:SourceOrgID` can be enabled via `log_bucket.enforce_s3_source_org_id` when validated in your org.
-    examples:
-      - title: "Reference"
-        code: |
-          ```text
-          https://docs.aws.amazon.com/awscloudtrail/latest/userguide/create-s3-bucket-policy-for-cloudtrail.html
-          ```
-  - icon: ""
-    title: KMS for CloudTrail and bucket encryption
-    short_description: Key policy allows CloudTrail GenerateDataKey, logs-account decrypt, and S3 via kms:ViaService.
-    long_description: |
-      Supports the common pattern where the CMK lives in a sec or log-archive account and the bucket uses SSE-KMS with bucket key enabled.
-    examples:
-      - title: "KMS block"
-        code: |
-          ```hcl
-          kms = { deletion_window_in_days = 30, enable_key_rotation = true }
-          ```
+
 important_notes: |
+  - **Org trail ARN vs provider (this module):** Organization trail ARNs always use the **management** account ID. Putting `aws_cloudtrail` on a **delegated** provider makes that ARN disagree with the provider account (noisy refresh/drift). **`aws_cloudtrail` stays on `aws.org`.**
+  - **CloudWatch Logs in `aws.sec`:** Configuring delivery to a log group there requires **`UpdateTrail` with credentials from that account**. The module uses a **Lambda in `aws.sec`**; the org-side trail resource does not apply cross-account CWL in one step. **Same account:** use the same provider for `aws.org` and `aws.sec`, or turn off the delegated Lambda path if you attach CWL yourself.
   - **Management account:** `is_organization_trail = true` must be created from the AWS Organizations management account (or delegated pattern per AWS docs).
-  - **Organizations:** When `enable = true`, the module reads `aws_organizations_organization` on the default provider.
-  - **Destroy order:** Terraform usually destroys the trail before the bucket; use `log_bucket.force_destroy = true` if objects remain.
-  - **Graph:** The trail module takes `s3_bucket_name` and `kms_key_id` from sibling module outputs, so Terraform orders creates/updates without explicit `depends_on`.
   - **Event selectors:** Override with `trail.event_selectors` when needed; omit to keep the module default (management events).
-  - **Destroy protection:** Terraform `lifecycle.prevent_destroy` cannot use variables; use stack policy, IAM, or manual processes to guard production deletes.
 input_table: |
-  | metadata | Standard GoCloud metadata (`key.company`, `key.env`, `environment`, optional `common_name` / `common_tags`, `aws_region` in consumers) | `any` | — | yes |
-  | cloudtrail_parameters | Main input map (`enable`, `trail_name`, `s3_key_prefix`, `tags`, nested `log_bucket`, `kms`, `trail`) | `any` | `{}` | no |
-  | cloudtrail_defaults | Optional defaults (e.g. `tags`); merged with `metadata.common_tags` and `cloudtrail_parameters.tags` on all child resources | `any` | `{}` | no |
-  | **cloudtrail_parameters.enable** | Create all resources | `bool` | `false` | no |
-  | **log_bucket** | `bucket_name`, `force_destroy`, `enable_versioning` (default true), `enable_bucket_policy`, `enable_sse_kms_default`, `enforce_s3_source_org_id`, access logging, lifecycle | `map` | see code | no |
-  | **kms** | `alias_name`, `description`, `deletion_window_in_days`, `enable_key_rotation` | `map` | see code | no |
-  | **trail** | `enable_cloudwatch_logs` (log group + role in `aws.sec`), `attach_cloudwatch_logs_via_delegated_lambda` (default true: Lambda in `aws.sec` calls `UpdateTrail`; set false to attach CWL yourself), `cloudwatch_log_group_name`, `cloudwatch_log_group_retention_days`, `cloudwatch_log_group_deletion_protection_enabled`, `event_selectors`, `sns_topic_arn` (sent as `sns_topic_name` to AWS; name or ARN). Org ID and management account ID for the CWL role policy come from Organizations data in the wrapper. | `map` | see code | no |
+  | enable | When `true`, create KMS, bucket, trail, and related resources (`count` gate). | `bool` | `false` | no |
+  | trail_name | `name` on `aws_cloudtrail` (trail identifier). | `string` | `` `{common_name}-org-trail` `` | no |
+  | s3_key_prefix | `s3_key_prefix` on `aws_cloudtrail`; prefix for log objects under the bucket. | `string` | `"cloudtrail"` | no |
+  | kms.description | `description` on `aws_kms_key`. | `string` | `` `KMS key for CloudTrail log encryption ({common_name})` `` | no |
+  | kms.deletion_window_in_days | `deletion_window_in_days` on `aws_kms_key` (waiting period after schedule delete, 7–30). | `number` | `30` | no |
+  | kms.enable_key_rotation | `enable_key_rotation` on `aws_kms_key`. | `bool` | `true` | no |
+  | kms.alias_name | `name` on `aws_kms_alias` (must start with `alias/`). | `string` | `` `alias/{common_name}-cloudtrail` `` | no |
+  | log_bucket.bucket_name | Globally unique `bucket` name on `aws_s3_bucket`. | `string` | `` `{common_name}-cloudtrail-logs-{log_account_id}` `` | no |
+  | log_bucket.force_destroy | `force_destroy` on `aws_s3_bucket` (allow delete when bucket has objects). | `bool` | `false` | no |
+  | log_bucket.enable_versioning | S3 bucket versioning (`aws_s3_bucket_versioning`). | `bool` | `true` | no |
+  | log_bucket.enforce_s3_source_org_id | If `true` and org ID is known, bucket policy adds `aws:SourceOrgID` condition (validate for your org before enabling). | `bool` | `false` | no |
+  | log_bucket.enable_bucket_policy | Attach module CloudTrail organization trail bucket policy. | `bool` | `true` | no |
+  | log_bucket.enable_sse_kms_default | Default encryption on the bucket using the module CMK (`aws_s3_bucket_server_side_encryption_configuration`). | `bool` | `true` | no |
+  | log_bucket.enable_server_access_logging | S3 server access logging for this bucket. | `bool` | `false` | no |
+  | log_bucket.access_logs_target_bucket | Target bucket for access logs (required if server access logging is enabled). | `string` | `""` | no |
+  | log_bucket.access_logs_target_prefix | Key prefix for access log objects. | `string` | `"s3-access-logs/"` | no |
+  | log_bucket.lifecycle_glacier_transition_days | Lifecycle rule: transition current version to `GLACIER` after N days; `null` skips. | `number` | `null` | no |
+  | log_bucket.lifecycle_expiration_days | Lifecycle rule: expire current objects after N days; `null` skips. | `number` | `null` | no |
+  | trail.enable_cloudwatch_logs | Turn on CloudWatch Logs delivery (log group and IAM role in `aws.sec`; see module notes). | `bool` | `false` | no |
+  | trail.attach_cloudwatch_logs_via_delegated_lambda | If `true` with CWL enabled, Lambda in `aws.sec` calls `cloudtrail:UpdateTrail`; org `aws_cloudtrail` ignores CWL attributes. | `bool` | `true` | no |
+  | trail.cloudwatch_log_group_name | `name` on `aws_cloudwatch_log_group` for trail logs. | `string` | `` `/aws/cloudtrail/{trail_name}` `` | no |
+  | trail.cloudwatch_log_group_retention_days | `retention_in_days` on `aws_cloudwatch_log_group`. | `number` | `90` | no |
+  | trail.cloudwatch_log_group_deletion_protection_enabled | `deletion_protection_enabled` on `aws_cloudwatch_log_group`. | `bool` | `true` | no |
+  | trail.event_selectors | `event_selector` blocks on `aws_cloudtrail` (`read_write_type`, `include_management_events`, `data_resources`); `null` uses module default (all management events). | `any` | `null` | no |
+  | trail.sns_topic_arn | Passed to `sns_topic_name` on `aws_cloudtrail` (AWS accepts topic name or ARN). | `string` | `null` | no |
+  | tags | A map of tags to assign to resources. | `map` | `{}` | no |
