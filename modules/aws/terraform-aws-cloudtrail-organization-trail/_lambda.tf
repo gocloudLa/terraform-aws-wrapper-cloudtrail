@@ -1,5 +1,15 @@
 locals {
   attach_cloudwatch_logs_via_lambda = var.enable_cloudwatch_logs && var.attach_cloudwatch_logs_via_delegated_lambda
+
+  # Not in use
+  want_log_group_arn = local.attach_cloudwatch_logs_via_lambda ? "${aws_cloudwatch_log_group.trail[0].arn}:*" : ""
+  want_role_arn      = local.attach_cloudwatch_logs_via_lambda ? aws_iam_role.cloudtrail_cwl[0].arn : ""
+  have_log_group_arn = local.attach_cloudwatch_logs_via_lambda ? aws_cloudtrail.this.cloud_watch_logs_group_arn : ""
+  have_role_arn      = local.attach_cloudwatch_logs_via_lambda ? aws_cloudtrail.this.cloud_watch_logs_role_arn : ""
+  trail_cwl_needs_update_trail = local.attach_cloudwatch_logs_via_lambda && (
+    local.have_log_group_arn != local.want_log_group_arn ||
+    local.have_role_arn != local.want_role_arn
+  )
 }
 
 module "trail_cwl_lambda" {
