@@ -14,6 +14,12 @@ customer-managed KMS key whose policy supports CloudTrail and cross-account S3 u
 
 ### ✨ Features
 
+- 🌲 [Organization trail with log bucket and CMK](#organization-trail-with-log-bucket-and-cmk) - Multi-Region organization trail writing to a dedicated S3 bucket encrypted with a customer-managed KMS key.
+
+- 📡 [CloudWatch Logs in the delegated account](#cloudwatch-logs-in-the-delegated-account) - Optional log group and IAM role on `aws.sec`, attached with UpdateTrail from that account.
+
+- 🎯 [Event selectors](#event-selectors) - Replace the default management-events selector when you need data events or a narrower read/write filter.
+
 
 
 ### 🔗 External Modules
@@ -25,39 +31,149 @@ customer-managed KMS key whose policy supports CloudTrail and cross-account S3 u
 
 ## 🚀 Quick Start
 ```hcl
-module "cloudtrail" {
-  source = "gocloudLa/wrapper-cloudtrail/aws"
+cloudtrail_parameters = {
+  enable = true
 
-  providers = {
-    aws.org = aws.org # management — organization trail
-    aws.sec = aws.sec # delegated admin — CloudWatch Logs (same as aws.org if single account)
-    aws.log = aws.log # log archive — S3 bucket
-    aws.kms = aws.kms # CMK account
+  # -------------------------------------------------------------------------
+  # Top-level — only add keys when you need non-defaults (see ../../locals.tf)
+  # -------------------------------------------------------------------------
+  # trail_name    = null  # default: "${metadata.common_name}-org-trail"
+  # s3_key_prefix = "cloudtrail"
+  # tags          = {}
+
+  # -------------------------------------------------------------------------
+  # log_bucket — commented lines show wrapper defaults; uncomment to override.
+  # -------------------------------------------------------------------------
+  log_bucket = {
+    # bucket_name                       = null
+    # enable_versioning                 = true
+    # enable_bucket_policy              = true
+    # enable_sse_kms_default            = true
+    # enforce_s3_source_org_id          = false
+    # enable_server_access_logging      = false
+    # access_logs_target_bucket         = ""
+    # access_logs_target_prefix         = "s3-access-logs/"
+    # lifecycle_glacier_transition_days = null
+    # lifecycle_expiration_days         = null
+
+    force_destroy = true # Default: false
   }
 
-  metadata = local.metadata
+  # -------------------------------------------------------------------------
+  # kms — commented lines show wrapper defaults; uncomment to override.
+  # -------------------------------------------------------------------------
+  kms = {
+    # alias_name              = null
+    # description             = null
+    # deletion_window_in_days = 30
+    # enable_key_rotation     = true
+  }
 
-  cloudtrail_parameters = {
-    enable = true
+  # -------------------------------------------------------------------------
+  # trail — commented lines show wrapper defaults; uncomment to override.
+  # -------------------------------------------------------------------------
+  trail = {
+    # enable_cloudwatch_logs                              = false
+    # cloudwatch_log_group_name                           = null
+    # cloudwatch_log_group_retention_days                 = 90
+    # cloudwatch_log_group_deletion_protection_enabled    = true
+    # event_selectors                                     = null
+    # sns_topic_arn                                       = null
 
-    log_bucket = {
-      force_destroy = false
-    }
-
-    kms = {
-      deletion_window_in_days = 30
-      enable_key_rotation     = true
-    }
-
-    trail = {
-      enable_cloudwatch_logs = false
-    }
+    # event_selectors example (replaces default when set):
+    # event_selectors = [
+    #   {
+    #     read_write_type           = "All"
+    #     include_management_events = true
+    #     data_resources            = []
+    #   },
+    # ]
   }
 }
 ```
 
 
 ## 🔧 Additional Features Usage
+
+### Organization trail with log bucket and CMK
+Creates the organization `aws_cloudtrail` on `aws.org`, the log archive bucket on `aws.log`, and the CMK on `aws.kms`.
+Set `enable = true` and override nested `log_bucket` / `kms` / `trail` keys only when you need non-defaults.
+
+
+<details><summary>Enable the organization trail</summary>
+
+```hcl
+cloudtrail_parameters = {
+  enable = true
+
+  log_bucket = {
+    force_destroy = true # Default: false
+  }
+
+  kms = {
+    deletion_window_in_days = 7     # Default: 30
+    enable_key_rotation     = false # Default: true
+  }
+}
+```
+
+
+</details>
+
+
+### CloudWatch Logs in the delegated account
+When `trail.enable_cloudwatch_logs` is true, the module creates the log group and delivery role on `aws.sec`.
+Cross-account attach uses a Lambda that calls `cloudtrail:UpdateTrail`; the org-side `aws_cloudtrail` does not set CWL attributes.
+Use the same provider for `aws.org` and `aws.sec` when the trail and log group live in one account.
+
+
+<details><summary>Deliver trail events to CloudWatch Logs</summary>
+
+```hcl
+cloudtrail_parameters = {
+  enable = true
+
+  trail = {
+    enable_cloudwatch_logs                           = true  # Default: false
+    cloudwatch_log_group_deletion_protection_enabled = false # Default: true
+  }
+}
+```
+
+
+</details>
+
+
+### Event selectors
+Omit `trail.event_selectors` to keep the module default (all management events). Set a list of selector maps to override `event_selector` blocks on `aws_cloudtrail`.
+
+
+<details><summary>Management events plus S3 data events</summary>
+
+```hcl
+cloudtrail_parameters = {
+  enable = true
+
+  trail = {
+    event_selectors = [
+      {
+        read_write_type           = "All"
+        include_management_events = true
+        data_resources = [
+          {
+            type   = "AWS::S3::Object"
+            values = ["arn:aws:s3:::example-bucket/"]
+          },
+        ]
+      },
+    ]
+  }
+}
+```
+
+
+</details>
+
 
 
 
