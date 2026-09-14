@@ -12,12 +12,12 @@ variable "metadata" {
 
 variable "cloudtrail_parameters" {
   type        = any
-  description = ""
+  description = "Organization CloudTrail trail, log bucket, and KMS configuration."
   default     = {}
 }
 
 variable "cloudtrail_defaults" {
   type        = any
-  description = ""
+  description = "Default values merged into each entry of cloudtrail_parameters."
   default     = {}
 }

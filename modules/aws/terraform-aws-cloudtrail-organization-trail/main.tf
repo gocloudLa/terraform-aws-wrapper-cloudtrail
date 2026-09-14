@@ -132,14 +132,14 @@ resource "aws_cloudtrail" "this" {
   dynamic "event_selector" {
     for_each = local.event_selectors_resolved
     content {
-      read_write_type           = lookup(event_selector.value, "read_write_type", "All")
-      include_management_events = lookup(event_selector.value, "include_management_events", true)
+      read_write_type           = try(event_selector.value.read_write_type, "All")
+      include_management_events = try(event_selector.value.include_management_events, true)
 
       dynamic "data_resource" {
-        for_each = coalesce(try(event_selector.value.data_resources, null), [])
+        for_each = try(event_selector.value.data_resources, [])
         content {
           type   = data_resource.value.type
-          values = data_resource.values
+          values = data_resource.value.values
         }
       }
     }

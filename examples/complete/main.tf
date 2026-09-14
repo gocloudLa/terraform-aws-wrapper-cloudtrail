@@ -2,10 +2,10 @@ module "wrapper_cloudtrail" {
   source = "../../"
 
   providers = {
-    aws.org = aws
-    aws.sec = aws
-    aws.log = aws
-    aws.kms = aws
+    aws.org = aws # Organization Management Account
+    aws.sec = aws # Security Tooling Account ( if exists )
+    aws.log = aws # Security Logging Account ( if exists )
+    aws.kms = aws # Security KMS Account ( if exists )
   }
 
   metadata = local.metadata
@@ -46,9 +46,6 @@ module "wrapper_cloudtrail" {
       # description             = null
       # deletion_window_in_days = 30
       # enable_key_rotation     = true
-
-      deletion_window_in_days = 7     # Default: 30
-      enable_key_rotation     = false # Default: true
     }
 
     # -------------------------------------------------------------------------
@@ -62,8 +59,6 @@ module "wrapper_cloudtrail" {
       # event_selectors                                     = null
       # sns_topic_arn                                       = null
 
-      cloudwatch_log_group_deletion_protection_enabled = false # Default: true; false so destroy can remove the log group in this example
-      #
       # event_selectors example (replaces default when set):
       # event_selectors = [
       #   {
