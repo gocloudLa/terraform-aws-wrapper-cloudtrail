@@ -4,7 +4,7 @@ locals {
 
 module "trail_cwl_lambda" {
   source  = "terraform-aws-modules/lambda/aws"
-  version = "8.7.0"
+  version = "8.12.0"
 
   count = local.attach_cloudwatch_logs_via_lambda ? 1 : 0
 
