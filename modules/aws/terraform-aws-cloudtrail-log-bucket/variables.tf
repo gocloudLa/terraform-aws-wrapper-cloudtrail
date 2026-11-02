@@ -91,3 +91,9 @@ variable "lifecycle_expiration_days" {
   description = "Expire current objects after N days (omit/null to skip)."
   default     = null
 }
+
+variable "lifecycle_noncurrent_version_expiration_days" {
+  type        = number
+  description = "Permanently delete noncurrent object versions N days after they become noncurrent (omit/null to skip)."
+  default     = null
+}

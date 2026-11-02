@@ -1,6 +1,7 @@
 output "bucket_id" {
   description = "S3 bucket name (id)."
-  value       = aws_s3_bucket.this.id
+  # Taken from the bucket policy when the module manages it: CloudTrail checks the policy on CreateTrail.
+  value = var.enable_bucket_policy ? aws_s3_bucket_policy.cloudtrail[0].bucket : aws_s3_bucket.this.id
 }
 
 output "bucket_arn" {

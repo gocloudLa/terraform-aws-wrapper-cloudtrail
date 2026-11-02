@@ -101,6 +101,8 @@ resource "aws_iam_role_policy_attachment" "cloudtrail_cwl" {
 }
 
 resource "aws_cloudtrail" "this" {
+  provider = aws.sec
+
   name = var.trail_name
 
   is_organization_trail = true
@@ -117,17 +119,8 @@ resource "aws_cloudtrail" "this" {
 
   sns_topic_name = var.sns_topic_arn
 
-  # cloud_watch_logs_group_arn = var.enable_cloudwatch_logs ? "${aws_cloudwatch_log_group.trail[0].arn}:*" : null
-  # cloud_watch_logs_role_arn  = var.enable_cloudwatch_logs ? aws_iam_role.cloudtrail_cwl[0].arn : null
-  # CloudWatch Logs integration for org trail + log group in delegated (aws.sec) is applied via
-  # cloudtrail:UpdateTrail from that account (see _lambda.tf). Do not set CWL here or the org provider
-  # hits cross-account PassRole / log-group ownership errors.
-  lifecycle {
-    ignore_changes = [
-      cloud_watch_logs_group_arn,
-      cloud_watch_logs_role_arn,
-    ]
-  }
+  cloud_watch_logs_group_arn = var.enable_cloudwatch_logs ? "${aws_cloudwatch_log_group.trail[0].arn}:*" : null
+  cloud_watch_logs_role_arn  = var.enable_cloudwatch_logs ? aws_iam_role.cloudtrail_cwl[0].arn : null
 
   dynamic "event_selector" {
     for_each = local.event_selectors_resolved

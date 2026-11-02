@@ -95,6 +95,25 @@ data "aws_iam_policy_document" "cloudtrail_organization" {
       }
     }
   }
+
+  statement {
+    sid    = "DenyInsecureTransport"
+    effect = "Deny"
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.this.arn,
+      "${aws_s3_bucket.this.arn}/*",
+    ]
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
 }
 
 resource "aws_s3_bucket_policy" "cloudtrail" {
@@ -146,6 +165,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
       for_each = var.lifecycle_expiration_days != null ? [1] : []
       content {
         days = var.lifecycle_expiration_days
+      }
+    }
+
+    dynamic "noncurrent_version_expiration" {
+      for_each = var.lifecycle_noncurrent_version_expiration_days != null ? [1] : []
+      content {
+        noncurrent_days = var.lifecycle_noncurrent_version_expiration_days
       }
     }
   }

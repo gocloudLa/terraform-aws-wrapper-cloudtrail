@@ -34,6 +34,7 @@ module "wrapper_cloudtrail" {
       # access_logs_target_prefix         = "s3-access-logs/"
       # lifecycle_glacier_transition_days = null
       # lifecycle_expiration_days         = null
+      # lifecycle_noncurrent_version_expiration_days = null
 
       force_destroy = true # Default: false
     }
