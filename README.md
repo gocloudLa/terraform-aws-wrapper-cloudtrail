@@ -22,12 +22,6 @@ customer-managed KMS key whose policy supports CloudTrail and cross-account S3 u
 
 
 
-### 🔗 External Modules
-| Name | Version |
-|------|------:|
-| <a href="https://github.com/terraform-aws-modules/terraform-aws-lambda" target="_blank">terraform-aws-modules/lambda/aws</a> | 8.7.0 |
-
-
 
 ## 🚀 Quick Start
 ```hcl
@@ -55,6 +49,7 @@ cloudtrail_parameters = {
     # access_logs_target_prefix         = "s3-access-logs/"
     # lifecycle_glacier_transition_days = null
     # lifecycle_expiration_days         = null
+    # lifecycle_noncurrent_version_expiration_days = null
 
     force_destroy = true # Default: false
   }
@@ -123,7 +118,7 @@ cloudtrail_parameters = {
 
 ### CloudWatch Logs in the delegated account
 When `trail.enable_cloudwatch_logs` is true, the module creates the log group and delivery role on `aws.sec`.
-Cross-account attach uses a Lambda that calls `cloudtrail:UpdateTrail`; the org-side `aws_cloudtrail` does not set CWL attributes.
+The trail is managed from `aws.sec` (delegated administrator), so the log group and role are attached natively on `aws_cloudtrail`.
 Use the same provider for `aws.org` and `aws.sec` when the trail and log group live in one account.
 
 
@@ -178,34 +173,34 @@ cloudtrail_parameters = {
 
 
 ## 📑 Inputs
-| Name                                                   | Description                                                                                                                                                         | Type     | Default                                                       | Required |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------- | -------- |
-| enable                                                 | When `true`, create KMS, bucket, trail, and related resources (`count` gate).                                                                                       | `bool`   | `false`                                                       | no       |
-| trail_name                                             | `name` on `aws_cloudtrail` (trail identifier).                                                                                                                      | `string` | `` `{common_name}-org-trail` ``                               | no       |
-| s3_key_prefix                                          | `s3_key_prefix` on `aws_cloudtrail`; prefix for log objects under the bucket.                                                                                       | `string` | `"cloudtrail"`                                                | no       |
-| kms.description                                        | `description` on `aws_kms_key`.                                                                                                                                     | `string` | `` `KMS key for CloudTrail log encryption ({common_name})` `` | no       |
-| kms.deletion_window_in_days                            | `deletion_window_in_days` on `aws_kms_key` (waiting period after schedule delete, 7–30).                                                                            | `number` | `30`                                                          | no       |
-| kms.enable_key_rotation                                | `enable_key_rotation` on `aws_kms_key`.                                                                                                                             | `bool`   | `true`                                                        | no       |
-| kms.alias_name                                         | `name` on `aws_kms_alias` (must start with `alias/`).                                                                                                               | `string` | `` `alias/{common_name}-cloudtrail` ``                        | no       |
-| log_bucket.bucket_name                                 | Globally unique `bucket` name on `aws_s3_bucket`.                                                                                                                   | `string` | `` `{common_name}-cloudtrail-logs-{log_account_id}` ``        | no       |
-| log_bucket.force_destroy                               | `force_destroy` on `aws_s3_bucket` (allow delete when bucket has objects).                                                                                          | `bool`   | `false`                                                       | no       |
-| log_bucket.enable_versioning                           | S3 bucket versioning (`aws_s3_bucket_versioning`).                                                                                                                  | `bool`   | `true`                                                        | no       |
-| log_bucket.enforce_s3_source_org_id                    | If `true` and org ID is known, bucket policy adds `aws:SourceOrgID` condition (validate for your org before enabling).                                              | `bool`   | `false`                                                       | no       |
-| log_bucket.enable_bucket_policy                        | Attach module CloudTrail organization trail bucket policy.                                                                                                          | `bool`   | `true`                                                        | no       |
-| log_bucket.enable_sse_kms_default                      | Default encryption on the bucket using the module CMK (`aws_s3_bucket_server_side_encryption_configuration`).                                                       | `bool`   | `true`                                                        | no       |
-| log_bucket.enable_server_access_logging                | S3 server access logging for this bucket.                                                                                                                           | `bool`   | `false`                                                       | no       |
-| log_bucket.access_logs_target_bucket                   | Target bucket for access logs (required if server access logging is enabled).                                                                                       | `string` | `""`                                                          | no       |
-| log_bucket.access_logs_target_prefix                   | Key prefix for access log objects.                                                                                                                                  | `string` | `"s3-access-logs/"`                                           | no       |
-| log_bucket.lifecycle_glacier_transition_days           | Lifecycle rule: transition current version to `GLACIER` after N days; `null` skips.                                                                                 | `number` | `null`                                                        | no       |
-| log_bucket.lifecycle_expiration_days                   | Lifecycle rule: expire current objects after N days; `null` skips.                                                                                                  | `number` | `null`                                                        | no       |
-| trail.enable_cloudwatch_logs                           | Turn on CloudWatch Logs delivery (log group and IAM role in `aws.sec`; see module notes).                                                                           | `bool`   | `false`                                                       | no       |
-| trail.attach_cloudwatch_logs_via_delegated_lambda      | If `true` with CWL enabled, Lambda in `aws.sec` calls `cloudtrail:UpdateTrail`; org `aws_cloudtrail` ignores CWL attributes.                                        | `bool`   | `true`                                                        | no       |
-| trail.cloudwatch_log_group_name                        | `name` on `aws_cloudwatch_log_group` for trail logs.                                                                                                                | `string` | `` `/aws/cloudtrail/{trail_name}` ``                          | no       |
-| trail.cloudwatch_log_group_retention_days              | `retention_in_days` on `aws_cloudwatch_log_group`.                                                                                                                  | `number` | `90`                                                          | no       |
-| trail.cloudwatch_log_group_deletion_protection_enabled | `deletion_protection_enabled` on `aws_cloudwatch_log_group`.                                                                                                        | `bool`   | `true`                                                        | no       |
-| trail.event_selectors                                  | `event_selector` blocks on `aws_cloudtrail` (`read_write_type`, `include_management_events`, `data_resources`); `null` uses module default (all management events). | `any`    | `null`                                                        | no       |
-| trail.sns_topic_arn                                    | Passed to `sns_topic_name` on `aws_cloudtrail` (AWS accepts topic name or ARN).                                                                                     | `string` | `null`                                                        | no       |
-| tags                                                   | A map of tags to assign to resources.                                                                                                                               | `map`    | `{}`                                                          | no       |
+| Name                                                    | Description                                                                                                                                                         | Type     | Default                                                       | Required |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------- | -------- |
+| enable                                                  | When `true`, create KMS, bucket, trail, and related resources (`count` gate).                                                                                       | `bool`   | `false`                                                       | no       |
+| trail_name                                              | `name` on `aws_cloudtrail` (trail identifier).                                                                                                                      | `string` | `` `{common_name}-org-trail` ``                               | no       |
+| s3_key_prefix                                           | `s3_key_prefix` on `aws_cloudtrail`; prefix for log objects under the bucket.                                                                                       | `string` | `"cloudtrail"`                                                | no       |
+| kms.description                                         | `description` on `aws_kms_key`.                                                                                                                                     | `string` | `` `KMS key for CloudTrail log encryption ({common_name})` `` | no       |
+| kms.deletion_window_in_days                             | `deletion_window_in_days` on `aws_kms_key` (waiting period after schedule delete, 7–30).                                                                            | `number` | `30`                                                          | no       |
+| kms.enable_key_rotation                                 | `enable_key_rotation` on `aws_kms_key`.                                                                                                                             | `bool`   | `true`                                                        | no       |
+| kms.alias_name                                          | `name` on `aws_kms_alias` (must start with `alias/`).                                                                                                               | `string` | `` `alias/{common_name}-cloudtrail` ``                        | no       |
+| log_bucket.bucket_name                                  | Globally unique `bucket` name on `aws_s3_bucket`.                                                                                                                   | `string` | `` `{common_name}-cloudtrail-logs-{log_account_id}` ``        | no       |
+| log_bucket.force_destroy                                | `force_destroy` on `aws_s3_bucket` (allow delete when bucket has objects).                                                                                          | `bool`   | `false`                                                       | no       |
+| log_bucket.enable_versioning                            | S3 bucket versioning (`aws_s3_bucket_versioning`).                                                                                                                  | `bool`   | `true`                                                        | no       |
+| log_bucket.enforce_s3_source_org_id                     | If `true` and org ID is known, bucket policy adds `aws:SourceOrgID` condition (validate for your org before enabling).                                              | `bool`   | `false`                                                       | no       |
+| log_bucket.enable_bucket_policy                         | Attach module CloudTrail organization trail bucket policy.                                                                                                          | `bool`   | `true`                                                        | no       |
+| log_bucket.enable_sse_kms_default                       | Default encryption on the bucket using the module CMK (`aws_s3_bucket_server_side_encryption_configuration`).                                                       | `bool`   | `true`                                                        | no       |
+| log_bucket.enable_server_access_logging                 | S3 server access logging for this bucket.                                                                                                                           | `bool`   | `false`                                                       | no       |
+| log_bucket.access_logs_target_bucket                    | Target bucket for access logs (required if server access logging is enabled).                                                                                       | `string` | `""`                                                          | no       |
+| log_bucket.access_logs_target_prefix                    | Key prefix for access log objects.                                                                                                                                  | `string` | `"s3-access-logs/"`                                           | no       |
+| log_bucket.lifecycle_glacier_transition_days            | Lifecycle rule: transition current version to `GLACIER` after N days; `null` skips.                                                                                 | `number` | `null`                                                        | no       |
+| log_bucket.lifecycle_expiration_days                    | Lifecycle rule: expire current objects after N days; `null` skips.                                                                                                  | `number` | `null`                                                        | no       |
+| log_bucket.lifecycle_noncurrent_version_expiration_days | Lifecycle rule: permanently delete noncurrent versions N days after they become noncurrent (versioned bucket); `null` skips.                                        | `number` | `null`                                                        | no       |
+| trail.enable_cloudwatch_logs                            | Turn on CloudWatch Logs delivery (log group and IAM role in `aws.sec`; see module notes).                                                                           | `bool`   | `false`                                                       | no       |
+| trail.cloudwatch_log_group_name                         | `name` on `aws_cloudwatch_log_group` for trail logs.                                                                                                                | `string` | `` `/aws/cloudtrail/{trail_name}` ``                          | no       |
+| trail.cloudwatch_log_group_retention_days               | `retention_in_days` on `aws_cloudwatch_log_group`.                                                                                                                  | `number` | `90`                                                          | no       |
+| trail.cloudwatch_log_group_deletion_protection_enabled  | `deletion_protection_enabled` on `aws_cloudwatch_log_group`.                                                                                                        | `bool`   | `true`                                                        | no       |
+| trail.event_selectors                                   | `event_selector` blocks on `aws_cloudtrail` (`read_write_type`, `include_management_events`, `data_resources`); `null` uses module default (all management events). | `any`    | `null`                                                        | no       |
+| trail.sns_topic_arn                                     | Passed to `sns_topic_name` on `aws_cloudtrail` (AWS accepts topic name or ARN).                                                                                     | `string` | `null`                                                        | no       |
+| tags                                                    | A map of tags to assign to resources.                                                                                                                               | `map`    | `{}`                                                          | no       |
 
 
 
@@ -214,8 +209,8 @@ cloudtrail_parameters = {
 
 
 ## ⚠️ Important Notes
-- **Org trail ARN vs provider (this module):** Organization trail ARNs always use the **management** account ID. Putting `aws_cloudtrail` on a **delegated** provider makes that ARN disagree with the provider account (noisy refresh/drift). **`aws_cloudtrail` stays on `aws.org`.**
-- **CloudWatch Logs in `aws.sec`:** Configuring delivery to a log group there requires **`UpdateTrail` with credentials from that account**. The module uses a **Lambda in `aws.sec`**; the org-side trail resource does not apply cross-account CWL in one step. **Same account:** use the same provider for `aws.org` and `aws.sec`, or turn off the delegated Lambda path if you attach CWL yourself.
+- **Trail managed from the delegated administrator:** `aws_cloudtrail` uses `aws.sec`. `aws.sec` must be the CloudTrail delegated administrator (service-delegation layer). The trail is still owned by the management account and its ARN carries the management account ID; the provider reads it by ARN, which works from the delegated administrator (lookup by name does not).
+- **CloudWatch Logs in `aws.sec`:** `UpdateTrail` passes the CloudWatch Logs role with `iam:PassRole`, which only works for roles in the calling account. That is why the trail is managed from `aws.sec`, the same account as the log group and role. **Same account:** use the same provider for `aws.org` and `aws.sec`.
 - **Management account:** `is_organization_trail = true` must be created from the AWS Organizations management account (or delegated pattern per AWS docs).
 - **Event selectors:** Override with `trail.event_selectors` when needed; omit to keep the module default (management events).
 
