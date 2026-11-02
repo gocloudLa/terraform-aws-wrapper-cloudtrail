@@ -7,6 +7,7 @@ locals {
 
   has_lifecycle = (
     var.lifecycle_glacier_transition_days != null ||
-    var.lifecycle_expiration_days != null
+    var.lifecycle_expiration_days != null ||
+    var.lifecycle_noncurrent_version_expiration_days != null
   )
 }

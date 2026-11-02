@@ -40,6 +40,7 @@ quick_start: |
       # access_logs_target_prefix         = "s3-access-logs/"
       # lifecycle_glacier_transition_days = null
       # lifecycle_expiration_days         = null
+      # lifecycle_noncurrent_version_expiration_days = null
 
       force_destroy = true # Default: false
     }
@@ -105,7 +106,7 @@ features:
     short_description: "Optional log group and IAM role on `aws.sec`, attached with UpdateTrail from that account."
     long_description: |
       When `trail.enable_cloudwatch_logs` is true, the module creates the log group and delivery role on `aws.sec`.
-      Cross-account attach uses a Lambda that calls `cloudtrail:UpdateTrail`; the org-side `aws_cloudtrail` does not set CWL attributes.
+      The trail is managed from `aws.sec` (delegated administrator), so the log group and role are attached natively on `aws_cloudtrail`.
       Use the same provider for `aws.org` and `aws.sec` when the trail and log group live in one account.
     examples:
       - title: "Deliver trail events to CloudWatch Logs"
@@ -149,8 +150,8 @@ features:
           }
           ```
 important_notes: |
-  - **Org trail ARN vs provider (this module):** Organization trail ARNs always use the **management** account ID. Putting `aws_cloudtrail` on a **delegated** provider makes that ARN disagree with the provider account (noisy refresh/drift). **`aws_cloudtrail` stays on `aws.org`.**
-  - **CloudWatch Logs in `aws.sec`:** Configuring delivery to a log group there requires **`UpdateTrail` with credentials from that account**. The module uses a **Lambda in `aws.sec`**; the org-side trail resource does not apply cross-account CWL in one step. **Same account:** use the same provider for `aws.org` and `aws.sec`, or turn off the delegated Lambda path if you attach CWL yourself.
+  - **Trail managed from the delegated administrator:** `aws_cloudtrail` uses `aws.sec`. `aws.sec` must be the CloudTrail delegated administrator (service-delegation layer). The trail is still owned by the management account and its ARN carries the management account ID; the provider reads it by ARN, which works from the delegated administrator (lookup by name does not).
+  - **CloudWatch Logs in `aws.sec`:** `UpdateTrail` passes the CloudWatch Logs role with `iam:PassRole`, which only works for roles in the calling account. That is why the trail is managed from `aws.sec`, the same account as the log group and role. **Same account:** use the same provider for `aws.org` and `aws.sec`.
   - **Management account:** `is_organization_trail = true` must be created from the AWS Organizations management account (or delegated pattern per AWS docs).
   - **Event selectors:** Override with `trail.event_selectors` when needed; omit to keep the module default (management events).
 input_table: |
@@ -172,8 +173,8 @@ input_table: |
   | log_bucket.access_logs_target_prefix | Key prefix for access log objects. | `string` | `"s3-access-logs/"` | no |
   | log_bucket.lifecycle_glacier_transition_days | Lifecycle rule: transition current version to `GLACIER` after N days; `null` skips. | `number` | `null` | no |
   | log_bucket.lifecycle_expiration_days | Lifecycle rule: expire current objects after N days; `null` skips. | `number` | `null` | no |
+  | log_bucket.lifecycle_noncurrent_version_expiration_days | Lifecycle rule: permanently delete noncurrent versions N days after they become noncurrent (versioned bucket); `null` skips. | `number` | `null` | no |
   | trail.enable_cloudwatch_logs | Turn on CloudWatch Logs delivery (log group and IAM role in `aws.sec`; see module notes). | `bool` | `false` | no |
-  | trail.attach_cloudwatch_logs_via_delegated_lambda | If `true` with CWL enabled, Lambda in `aws.sec` calls `cloudtrail:UpdateTrail`; org `aws_cloudtrail` ignores CWL attributes. | `bool` | `true` | no |
   | trail.cloudwatch_log_group_name | `name` on `aws_cloudwatch_log_group` for trail logs. | `string` | `` `/aws/cloudtrail/{trail_name}` `` | no |
   | trail.cloudwatch_log_group_retention_days | `retention_in_days` on `aws_cloudwatch_log_group`. | `number` | `90` | no |
   | trail.cloudwatch_log_group_deletion_protection_enabled | `deletion_protection_enabled` on `aws_cloudwatch_log_group`. | `bool` | `true` | no |
